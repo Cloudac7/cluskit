@@ -183,6 +183,26 @@ def _average_minimum_distance(positions):
     avemin = minimums.mean()
     return avemin
 
+def _maximum_minimum_distance(positions):
+    """Helper function to determine the maximum of minimum distance
+    in a set of points.
+
+    This function is important to ensure a robust guess of the
+    max_bondlength parameter for the delaunay algorithm.
+
+    Args:
+        positions (2D ndarray) :    points in n-dimensional space. Can be e.g.
+                                    real or feature space
+
+    Returns:
+        float : average minimum distance between points
+    """
+    dist_matrix = squareform(pdist(positions))
+    ma = np.ma.masked_equal(dist_matrix, 0.0, copy=False)
+    minimums = np.min(ma, axis=0)
+    maxmin = minimums.max
+    return maxmin
+
 class Cluster(ase.Atoms):
     """ A child class of the ase.Atoms object. 
     It is a nanocluster class with additional methods and attributes, 
@@ -262,7 +282,7 @@ class Cluster(ase.Atoms):
             )
 
 
-    def get_surface_atoms(self, mask=False):
+    def get_surface_atoms(self, mask=False, judgement="average"):
         """Determines the surface atoms of the nanocluster using delaunay
         triangulation.
         A maximum bondlength determining how concave a surface can be can be 
@@ -275,9 +295,11 @@ class Cluster(ase.Atoms):
         are populated
 
         Args: 
-            mask (bool) :   If set to True, a mask array will be returned.
-                            If False, an array of indices of surface atoms 
-                            is returned
+            mask (bool) :       If set to True, a mask array will be returned.
+                                If False, an array of indices of surface atoms
+                                is returned
+            judgement (str) :   Judging surface according to average bond length
+                                or maximum of bond lengths.
 
         Returns:
             1D ndarray : indices of surface atoms
@@ -293,6 +315,8 @@ class Cluster(ase.Atoms):
         pos = self.get_positions()
 
         # delaunator not only gets surface atoms but also adsorption site locations
+        if judgement == "maximum":
+            self.max_bondlength = _maximum_minimum_distance(self.positions) * np.sqrt(3)
         summary_dict = delaunator(pos, self.max_bondlength)
 
         ids_surface_atoms = summary_dict["ids_surface_atoms"]
