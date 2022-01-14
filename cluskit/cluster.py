@@ -200,7 +200,7 @@ def _maximum_minimum_distance(positions):
     dist_matrix = squareform(pdist(positions))
     ma = np.ma.masked_equal(dist_matrix, 0.0, copy=False)
     minimums = np.min(ma, axis=0)
-    maxmin = minimums.max
+    maxmin = minimums.max()
     return maxmin
 
 class Cluster(ase.Atoms):
@@ -223,7 +223,8 @@ class Cluster(ase.Atoms):
                 constraint=None,
                 calculator=None,
                 info=None,
-                surface=None):
+                surface=None,
+                judgement="average"):
         """Upon initialization, the surface is defined using the
         delaunay algorithm. Other attributes get defaults such
         as self.descriptor_setup = SOAP, they can be overwritten
@@ -253,7 +254,10 @@ class Cluster(ase.Atoms):
         self.adsorption_vectors = {}
 
         # empiric multiplier, used for determining surface atoms
-        self.max_bondlength = _average_minimum_distance(self.positions) * 1.7
+        if judgement == "maximum":
+            self.max_bondlength = _maximum_minimum_distance(self.positions) * np.sqrt(3)
+        else:
+            self.max_bondlength = _average_minimum_distance(self.positions) * 1.7
 
         if surface is not None:
             if isinstance(surface[0], bool) or isinstance(surface[0], np.bool_):
@@ -282,7 +286,7 @@ class Cluster(ase.Atoms):
             )
 
 
-    def get_surface_atoms(self, mask=False, judgement="average"):
+    def get_surface_atoms(self, mask=False):
         """Determines the surface atoms of the nanocluster using delaunay
         triangulation.
         A maximum bondlength determining how concave a surface can be can be 
@@ -298,8 +302,6 @@ class Cluster(ase.Atoms):
             mask (bool) :       If set to True, a mask array will be returned.
                                 If False, an array of indices of surface atoms
                                 is returned
-            judgement (str) :   Judging surface according to average bond length
-                                or maximum of bond lengths.
 
         Returns:
             1D ndarray : indices of surface atoms
@@ -315,8 +317,6 @@ class Cluster(ase.Atoms):
         pos = self.get_positions()
 
         # delaunator not only gets surface atoms but also adsorption site locations
-        if judgement == "maximum":
-            self.max_bondlength = _maximum_minimum_distance(self.positions) * np.sqrt(3)
         summary_dict = delaunator(pos, self.max_bondlength)
 
         ids_surface_atoms = summary_dict["ids_surface_atoms"]
